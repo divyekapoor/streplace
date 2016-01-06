@@ -1,0 +1,630 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\" Copyright (c) Kai Schütz <kais@i6.informatik.rwth-aachen.de>
+.TH streplace 1 
+.SH NAME
+
+streplace \- replace strings in (multiple) files and/or filenames using regular-expressions or simple substrings
+
+.SH SYNOPSIS
+.B streplace 
+[\-rloHCEiInxwbSANfsMU0OdTLQqPh] [\-\-recursive] [\-\-follow\-links]
+[\-\-only=LIST] [\-\-html\-only] [\-\-c\-only] [\-\-ignore\-errors]
+[\-\-ignore\-case] [\-\-preserve\-case] [\-\-lower\-case]
+[\-\-upper\-case] [\-\-capitalize\-case] [\-\-match\-newline]
+[\-\-no\-regexp] [\-\-whole\-words] [\-\-const\-length] [\-\-try\-all\-pos] [\-\-backup] [\-\-suffix=SUF]
+[\-\-restore] [\-\-rename] [\-\-rename\-only] [\-\-across\-dirs] [\-\-force] [\-\-modify\-symlinks] [\-\-shorten=N]
+[\-\-sane\-filename] [\-\-sane\-filename2] [\-\-norm\-extension]
+[\-\-ignfilepat=P] [\-\-ignfilepat\-nore] [\-\-maxfilesize=N] [\-\-dos\-to\-unix]
+[\-\-color\-bold=SEQ] [\-\-color\-thin=SEQ] [\-\-color\-nor=SEQ]
+[\-\-dummy\-mode] [\-\-dummy\-trace] [\-\-dummy\-linetrace]
+[\-\-context=[+]N] [\-\-no\-color] [\-\-quiet]
+[\-\-progress=NUM] [\-\-help] [\-\-version]
+[\-\-verbose\-config] [\-\-rc\-file=FILE] [\-\-create\-rc=FILE]
+RULES [\-\-] [\-|FILES and/or DIRS]
+
+.SH VERSION
+This manpage belongs at least to version 
+.B 0.9.26
+of streplace (as of 2004-05-05). If you find it out of date you may try
+.B streplace --help
+which prints a list of all options together with a short explaination for each option.
+
+.SH DESCRIPTION
+.B streplace
+is a program that substitutes strings in files according to
+rules. Multiple rules can be given whereas every rule normally is a
+regular expression allowing sophisticated substitutions. Because
+regular-expressions are both powerful and dangerous multiple backup
+and test options exist. As a special feature it's possible to replace
+strings in filenames! Ever wanted to replace all that disgusting '%20E'
+stuff in the html-files you just downloaded with
+.BR wget "? No problem with"
+.BR streplace "! (see option -A)"
+.sp
+Once you'll get used to it you'll start to ask yourself how you could
+have lived without!
+.sp
+.b streplace
+works in-situ in the sense that it permanently modifies existing files. It does not (usually) create new files.
+.SH RULES
+The rules tell streplace what to do. You may specify as many rules as you
+like, but at least one rule is needed. A rule consists of a left hand side
+and a right hand side separated by a single '='-character. E.g. 
+.B foo=bar
+means replace the string 
+.BR foo " by string " bar "."
+If you want to replace 
+.B -foo
+by
+.B ba=r
+you have to specify 
+.BR \\\\\\\\-foo=ba\\\\\\\\=r .
+(You have to protect the
+.RB ' - "' from being an option"
+.RB ( -foo=bar " is the equivalent to"
+.BR "--force --only o=bar" )
+and you have to make the second 
+.BR "" ' = "' a literal '" = "'."
+.sp
+Both sides of a rule are interpreted like string constants in C. For example
+you can use '\\n', '\\012' or '\\x0a' to produce a single line feed character.
+It is possible to replace arbitrary byte sequences by arbitrary byte
+sequences since even null characters ('\\0' == 0x00) are allowed inside
+strings (unlike C strings). However, null characters are not allowed in
+regular expressions. You may always use null characters on the right hand side
+and with the 
+.B -x
+option also on the left hand side. Note that control characters (ASCII 0-31)
+are not very useful for filenames and therefore you cannot use them on the
+right hand side for the rename operations unless you specify 
+.BR --force . 
+Also note that you cannot use null characters in
+filenames or in the contents of symbolic links since these are null terminated
+C strings. To get a literal backslash use '\\\\'.
+
+When using regular expressions parenthesized subexpressions can be reused 
+on both sides of a rule using '\\\\n' (where n is a single digit) for the n-th parenthesized
+subexpression. (You must double the backslash due to the C string
+compilation.) For details on regular expressions see 
+.BR grep (1). 
+Note that streplace uses extended regular expressions and you
+can control the behavior of the regular expressions with the 
+.B --ignore-case
+and the 
+.B --match-newline
+options.
+
+.SH FILE OPTIONS
+
+.TP
+.I "-r, --recursive"
+Normally directories given on the command line are ignored. With this
+option all given directories are treated recursively. Use 
+.B -r\ .
+to start from the current directory.
+
+.TP
+.I "-l, --follow-links"
+Normally all symbolic links are ignored. With this option symbolic
+links are treated like normal files and directories. If substitution
+takes place in filenames (see 
+.BR --rename , " --rename-only" ") the name of the"
+link is changed, not the path it points to. To achieve this effect see
+.BR --modify-symlinks . 
+
+.TP
+.I "-o, --only=LIST"
+This option can be used to process only files with certain
+extensions. The extensions are given in a comma separated list LIST. If
+multiple lists are given all of the extensions are valid. E.g. all
+C-sources: \-o c,h
+
+.TP
+.I "-H, --html-only"
+Same as 
+.B -o 'html,htm,shtml'
+
+.TP
+.I "-C, --c-only"
+Same as 
+.B -o 'c,cc,C,cxx,cpp,h,hh,H,hxx,hpp,i,inc'
+
+.TP
+.I "-E, --ignore-errors"
+By default streplace stops on the first file operation error (i.e. a file/dir can't
+be read, written or renamed). This option tells streplace to ignore such errors
+and continue with the next file. However, if 
+.B -q
+is not present a warning is printed for each error.
+
+.TP
+.I "-"
+(Not really a file option, more like a file.) One single dash indicates streaming mode: Read from stdin and write to stdout.
+If other files are also specified the dash is treated as a normal filename.
+(Note that this is not yet implemented as real streaming: Streplace first
+reads from stdin until EOF then does the replacement and then writes the
+result to stdout. You really
+should consider using 
+.BR sed "(1) if this is a problem.)"
+
+.SH MATCHING OPTIONS
+
+.TP
+.I "-i, --ignore-case"
+Searching for expressions is done case insensitive. A left hand side of a
+rule 
+.BR foo=bar " will match " foo ", " Foo ", " FOO ", " foO " and so on."
+
+.TP
+.I "-I, --preserve-case"
+With this option streplace tries to preserve the case of the word during
+replacement.
+If you want to replace 
+.BR foo " by " bar ", " Foo " by " Bar " and " FOO " by " BAR " then just"
+use something like
+.BR "-iI foo=bar" .
+
+.TP
+.I "--lower-case"
+Use this if you want to reuse a lower-case-version of a substring of your regular expression on the right
+hand side of a rule. The following options fold all characters to
+lower case: --lower-case '.=\\\\0' . (The \\\\0 is replaced by the whole
+matching string.)
+
+.TP
+.I "--upper-case"
+Same as 
+.BR "--lower-case" " but fold chars to upper case."
+
+.TP
+.I "--capitalize-case"
+.BR "--lower-case" " but fold first char of each matching sequence to upper"
+case. 
+
+.TP
+.I "-n, --match-newline"
+By default, the match-any-character-operators (like '.' or '[^)]') in a regular expression do not
+match the newline (0x0a == '\\n') character ('.*' will end at the end of a line).
+With this option a match-any-character-operator can span several lines. (In
+fact, it may span the whole file.)
+
+.TP
+.I "-x, --no-regexp"
+Normally streplace interprets every left hand side of a rule as an extended
+regular expression. With this option every left hand side of a rule is
+treated as a simple string. A simple substring search is performed to find
+a match. This is particularly useful for binary files. These are files containing
+NUL chars and regular expressions do not work on such strings. 
+.sp
+Note: Normally binary file are ignored, but with this option they are treated just
+like any other file.
+
+.TP
+.I "-w, --whole-words"
+This option is only allowed in conjunction with the 
+.B -x 
+option. With this option the left hand side of a rule only matches whole
+words, not arbitrary substrings inside a word. (e.g. 
+.BR foo " will not match " foobar .
+
+.TP
+.I "--const-length"
+When patching binary files using 
+.B -x
+it is often required that strings are replaced by strings of the same length. When this option is specified
+an error is printed if the left and the right side of a rule differ in length. This option is only allowed in conjunction with the 
+.B -x 
+option. 
+
+.TP
+.I "--try-all-pos"
+This is a rather special option espcially useful when trying to patch a binary file.
+Sometimes a specific pattern which is to be replaced is not specific enough and occurs more than one time (say N times) in a file.
+When this option is specified streplace creates N files named nnn_hexpos_filename, where nnn is an index in the range 0..N-1 and hexpos is the hexadecimal 
+offset of the pattern in the file which is replaced in thsi version of the file. So this options effectively creates N modified copies of the original file
+which are all different. They all differ from the original file in a single location which matches the left hand side of a rule.
+Note that the rules are also applied to the original file which is probably destroyed.
+This option is only allowed in conjunction with the 
+.B -x 
+option. 
+
+
+
+.SH BACKUP OPTIONS
+
+.TP
+.I "-b, --backup"
+
+With this option it is possible to 'undo' modifications you do to files. Most
+substitutions can not be reversed by simply exchanging the left and the
+right side of a rule. And sometimes a rule does not what you expect it to do.
+(No, 'a.*a='
+does not remove all words starting and ending with an 'a'.)
+This option make a backup copy of each file that is about to be modified
+just before it is modified. The name of the backup file is the original
+filename plus a suffix which can be set with the 
+.B --suffix
+option. Already existing backup files are not overwritten, so that always
+the oldest version survives (unlike other backup files). This is done to make
+it possible to undo multiple runs of streplace. But you should remove all
+backup files when you are sure you want to keep the modifications. Otherwise
+very old backup file may someday overwrite more current version on a 
+.BR --restore ", which might not be what you want."
+.sp
+Note: Backups are created after (possibly) renaming files to make it
+possible for streplace to find the corresponding original file for each backup file.
+The 
+.B --restore 
+option can not undo the effects of the
+.B --rename 
+options!
+
+.TP
+.I "-S, --suffix=SUF"
+You can set the backup file suffix (default '.~sub~') with this option.
+
+.TP
+.I "--restore"
+Once you will discover that something bad has happened to your files (regular
+expressions can be very evil, and 
+.B -r 
+can destroy tons of data). When you have been smart enough to make backups (see
+.BR -B ") you can restore the original versions of all (or of selected)"
+files just by specifying the original filenames together with the 
+.B --rename
+option. The 
+.B -r 
+option works the same way it works during normal operation.
+
+.SH RENAMING OPTIONS
+
+.TP
+.I "-A, --rename"
+By specifying this option you tell streplace to apply all rules to each
+filename *and* to each file's contents. Files may be modified and/or renamed
+at the same time. This may sound strange but it is sometimes very useful.
+The very first version of streplace (aka stool) was originally written to
+perform this special task: The
+.BR wget (1))
+command can be used to recursively download whole web sites by following 
+all hyper links. Unfortunately all unsafe characters (like the tilde '~') are
+encoded into their hexadecimal equivalent prepended by a percent (e.g. '%7E'
+for tilde). This looks very ugly and does not work with netscape, which knows
+this encoding and translates it back into the unsafe character and
+consequently does not find the file. Renaming all files does not solve the
+problem since all hyper links inside the files also contain the encoded
+characters. It would also be a tremendous task to rename and modify hundreds of
+files. A single
+.B streplace -AHr '%7E=~' www.downloaded-by-wget.org
+solved all problems.
+
+.TP
+.I "-N, --rename-only"
+With this option files and dirs are only renamed -- their content is left
+untouched. streplace becomes a complex multi-file-rename-utility like 
+.BR mmv (1)
+just with regular expressions instead of shell 'glob' style matching.
+Of course regular expressions are much more powerful ...
+
+.TP
+.I "--across-dirs"
+By specifying this option when you rename files (using -N or -A) you tell streplace to apply
+the rules to the whole path specified for each file, not only to the filename itself. The directory separator 
+.B // 
+(slash) becomes an ordinary character which can be replaced by anything just like any other character. Any amount of slashes may occur on
+the left and/or on the right side of each rule. If the path is modified by the replace operation the file is effectively moved up or down or sideways
+in the directory hierarchy. 
+
+You can for example use this to flatten a whole directory tree: 
+.B streplace --across-dirs -N -r . /=_ 
+will flatten all directries under your current working directory. All the files will be in your current working directory, still containing the path
+components, but now they are separated by an underscore instead of a slash. You can of course try to reverse the effect by using
+.B streplace --across-dirs -N -r . _=/
+but the file 
+.B src/data/a_b_c_d_e_f_g_h 
+will be located under 
+.B src/data/a/b/c/d/e/f/g/h
+after the second command.
+
+Note that this option never removes or renames any directory. It may however create lots of new directories and move files up and down 
+the hierarchy into new and existing directories.
+
+.TP
+.I "-f, --force" 
+Normally streplace refuses to remove a file or directory due to
+a filename collision (i.e. the target filename already exists). Use this
+option to force the replacement of the target file/dir (i.e. the target
+file/dir is removed). Note that only empty directories can be removed. 
+.B Use this option with caution!
+
+.TP
+.I "-s, --modify-symlinks"
+This is the most unusual option of streplace. You can rename a file. You can
+rename a symbolic link. You can also rename a file which a symbolic link
+used to point to. Now this link is invalid. Moving the link of course
+won't solve the problem. You have to change the 'content' (i.e. where it
+points to) of the link. This is exactly what this option can do for you.
+It works much like the 
+.B -N option
+but changes only the symbolic link's content. All file-/dir-/link-names and
+file's contents are left untouched.
+
+Note: The content of a symbolic links is more like a simple string than
+like a real pathname: You can easily change a link 'test.c -> ../../fft.c' 
+into 'test.c -> .fast./fft.c' by using 
+.B streplace -sx './.=fast'
+(with strange effects to your source ;-)  ). 
+This option is most useful when moving a directory up or down the directory
+structure which contains relative symbolic links to the outside or when a
+directory has been renamed and now all symbolic links to it must be updated.
+
+
+.TP
+.I "--shorten=N"
+When renaming files (using -N or -A) shorten the target filename using certain heuristics so that it contains at most N characters.
+Filenames shorter or equal to N are left untouched. The following heuristics are applied until the filename is short enough:
+.nf
+   - the file extension is not modified at all
+   - remove all occurences of the word "the" wherever it occurs between spaces (not as a substring)
+   - replace duplicate separation characters like double spaces or -- or __ by simple spaces or -
+   - remove all spaces and - chars
+.fi
+As soon as the filename is short enough the shortening process stops.
+
+
+.SH SPECIAL OPTIONS
+
+.TP
+.I "--ignfilepat=P"
+(ignore-file-pattern) Search the content of each file for pattern P. If it is found at least once 
+this file is ignored for replacement operations in its contents. This
+does not affect renaming operations. Multiple ignore patterns may be
+specified.
+
+.TP
+.I "--ignfilepat-nore"
+Match the ignore-file-pattern (s.a.) as a simple string, not as a
+regular expression. This is useful with binary files.
+
+.TP
+.I "-M, --max-filesize=N"
+Skip files which are larger than N megabytes. A value of 0 indicates
+no file size limit, which is the default. This does not affect renaming 
+operations. 
+
+.TP
+.I "-U, --dos-to-unix"
+Transform every file that has only dos line termination (lets call it a dos
+file) into unix
+format. This option adds the implicit rule '\\r\\n=\\n' to the 
+given rules. Before the rule is applied to a file it is checked if
+the file contains at least one non-dos style line termination. If this
+is the case this file is ignored since it is not a plain dos file.
+
+This works also on binary files like archives or executables that
+have been erroneously transformed from unix into dos format by the ASCII 
+transfer mode of an FTP client or server. Netscape somehow does this from 
+time to time.
+
+You can safely apply this option recursively since it is very unlikely that
+it will harm an existing file which is not a dos file. However, you may want
+to do a dry run (with -0) first to see what will happen.
+    
+.SH CONFIGURATION OPTIONS
+
+.TP
+.I "--color-bold=SEQ"
+Escape sequence SEQ is used to switch terminal to bold
+mode, which is used to highlite important information.
+
+.TP
+.I "--color-thin=SEQ"
+Escape sequence SEQ is used to switch terminal to thin
+mode, which is used to display separators and other unimpotant 
+formatting strings.
+
+.TP
+.I "--color-nor=SEQ"   
+Escape sequence SEQ is used to switch terminal back to the normal
+mode, which is used to display everything else.
+
+.SH COMMON OPTIONS
+
+.TP
+.I "-0, --dummy-mode"
+Since the effect of streplace may not be reversible it is very useful to see
+what would happen before it really happens (what files would be
+affected/renamed, how many replacements would occur). With this option
+nothing ever changes on disk (except of the file's access time, of course).
+All files are opened read-only; nothing is written/removed/renamed.
+Everything else just happens normally. Use this option to do a 'dry run'
+before you scramble your data and check if the number of replacements seems
+plausible to you.
+
+.TP
+.I "-T, --dummy-trace"
+This option hash the same effect as the  
+.BR -0
+option. Additionally the verbose output is disabled and each file that
+contains at least one match is printed to stdout as it would finally look
+like. All replacements are highlighted with ANSI color sequences in bold
+yellow.
+
+.TP
+.I "-L, --dummy-linetrace"
+This option is similar to the 
+.B --dummy-trace
+option, but only lines containing matches are printed in their context
+(see
+.BR --context ).
+
+.TP
+.I "--context=[+]N"
+The number of lines printed as context before and after a line containing a
+match
+.RB ( --dummy-linetrace )
+is controlled with this option. A value of 0 prints only the lines
+containing a match. Use '+N' to disable the block separator lines. The
+default value is 1.
+
+.TP
+.I "-Q, --no-color"         
+Use this option to disable the colorization of the output with
+ANSI escape sequences (e.g. for terminals that do not support this).
+
+.TP
+.I "-q, --quiet"
+By default streplace is very verbose. With this option streplace is
+absolutely quiet. Only fatal errors are reported to stderr.
+
+.TP
+.I "-P, --progress=NUM"
+This option prints one dot ('.') per NUM replacements. Complex regular expressions
+can be very slow with large files because for some regular expressions the
+whole file has to be searched for every match. So you may want to see what's
+going on.
+
+.TP 
+.I "-h, --help"
+A detailed help message is printed and streplace exits immediately. Any other 
+options and parameters are ignored.
+
+.TP 
+.I "--version"
+Prints version information, then exits.
+
+.SH CONFIG FILE OPTIONS
+
+.TP
+.I "--verbose-config"
+Print all configuration options, values and where they were
+specified, then exit sucessfully. (Only available on the command line.)
+
+.TP
+.I "--rc-file=FILE"
+Use FILE as rcfile. (Only available on the command line.)
+
+.TP 
+.I "--create-rc=FILE"
+
+Create a FILE with default values for all options.
+(Only available on the command line.)
+
+.SH FILES and VARIABLES
+
+The configuration file will be searched in the following places (highest priotity
+last): 
+.nf
+.B /etc/streplacerc
+.B ~/.streplacerc
+.B --rc-file=FILE
+.fi
+Options specified in the environment variable 
+.B STREPLACE
+override anything in the config files and options specified on the command
+line override everything.
+
+
+
+.SH EXAMPLES
+
+To replace 
+.B foo 
+by 
+.B bar 
+in all C source files under dir
+.BR src :
+.nf
+.B streplace -Cr foo=bar src
+
+A simple preprocessing command can look like this:
+.B streplace 'Square[(]([^)]*)[)]=(\\\\\\\\1*\\\\\\\\1)' '__OFFSET=7' src.c
+
+A file containing these three lines:
+.B Square(2)+__OFFSET
+.B Square(Square(3))
+.B Square(__OFFSET)
+
+will look like this afterwards:
+.B (2*2)+7
+.B (Square(3*Square(3))
+.B (7*7)
+
+So, streplace is not a very good preprocessor.   :-(
+
+The order of the rules matters:
+.B streplace 1=2 2=3 3=4 number.h
+converts the line
+.B 1
+into
+.B 4
+but
+.B streplace 3=4 2=3 1=2 number.h
+converts the line 
+.B 1
+into 
+.B 2
+
+To convert all filenames in a directory tree to lowercase:
+.B streplace -rN --lower-case '.*=\\\\\\\\0' /scratch/from_bill
+
+To convert a DOS/Windows plaintext file to UNIX format:
+.B streplace -U plain.txt 
+.fi
+
+.SH BUGS
+The --follow-links option behaves strange when specifying --rename or
+--rename-only. It is also not possible to rename directories without
+recursing them.
+
+.sp
+The --follow-links option may do stupid things with the
+--make-backups/--restore facility.
+
+.sp
+Backups don't work well with the --rename options.
+The --make-backups option makes backups of already renamed files and --restore
+can not unrename. This will probably never be fixed.
+
+.sp
+The --dummy-trace and --dummy-linetrace options may produce funny results when
+using more than one rule. (Trailing rules may replace something in the
+ANSI color sequences which will have strange results.)
+
+.sp
+Everything is loaded as a whole into memory. So it is not possible to process
+very large files with streplace although there is no explicit limit. This is partly due to the fact that regular
+expressions sometimes have global effects but the real reason is me being
+too lazy to do real streaming. This will probably never be fixed. You really
+should consider using 
+.BR sed "(1) if this is a problem."
+
+.SH AUTHOR
+Manpage by Kai Schuetz <Kai.Schuetz@gmx.de> and
+Johannes Overmann <Johannes.Overmann@gmx.de>
+.sp
+.nf
+streplace (c) 1997-2004 by
+Johannes Overmann <Johannes.Overmann@gmx.de>.
+Comments, bugs and suggestions welcome.
+.fi
+
+.SH COPYRIGHT
+Copyright 1997-2004 by Johannes Overmann <overmann@iname.com>
+.sp
+streplace is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 2 of the License, or (at your
+option) any later version.
+.sp
+streplace is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+.sp 
+You should have received a copy of the GNU General Public License
+along with streplace; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+	 
+.SH SEE ALSO
+.BR sed "(1), " awk "(1), " grep "(1), " mmv "(1), " tr "(1)"
